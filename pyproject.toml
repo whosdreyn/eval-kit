@@ -1,7 +1,7 @@
 [project]
-name = "trajectory-engine"
+name = "eval-kit"
 version = "0.1.0"
-description = "Add your description here"
+description = "Automated evaluation of LLM agents, graphs, chatbots and RAG with LangSmith: trajectory checks, bootstrap statistics and a CI regression gate."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []

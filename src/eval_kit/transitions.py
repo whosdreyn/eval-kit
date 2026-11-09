@@ -1,6 +1,6 @@
 """Order check: is every move from one tool to the next allowed by the agent's DAG?"""
 
-from trajectory_engine.trajectory import Step
+from eval_kit.trajectory import Step
 
 START = "START"
 END = "END"
