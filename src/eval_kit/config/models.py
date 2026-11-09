@@ -119,6 +119,14 @@ class RulesConfig(Strict):
             raise ValueError("; ".join(conflicts))
         return self
 
+class BaselineConfig(Strict):
+    """[baseline]: the experiment the candidate is compared to.
+
+    Attributes:
+        experiment: Name of the LangSmith experiment of the version in production.
+    """
+
+    experiment: str = Field(min_length=1)
 
 class EvalConfig(Strict):
     """The whole eval.toml: one field per [section], each validated by its own model."""
@@ -129,6 +137,7 @@ class EvalConfig(Strict):
     run: RunConfig
     tools: dict[str, ToolAccess] = Field(default_factory=dict)
     rules: RulesConfig
+    baseline: BaselineConfig | None = None
 
     @model_validator(mode="after")
     def tools_whitelist_for_agents(self) -> "EvalConfig":

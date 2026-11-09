@@ -103,3 +103,13 @@ def test_config_is_read_only(tmp_path):
     config = load_config(write(tmp_path, VALID))
     with pytest.raises(ValidationError):
         config.run.repetitions = 10
+
+def test_baseline_is_optional(tmp_path):
+    config = load_config(write(tmp_path, VALID))
+    assert config.baseline is None
+
+
+def test_baseline_is_read(tmp_path):
+    text = VALID + '\n[baseline]\nexperiment = "prompt-v6-7521d4ba"\n'
+    config = load_config(write(tmp_path, text))
+    assert config.baseline.experiment == "prompt-v6-7521d4ba"

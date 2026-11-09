@@ -28,6 +28,7 @@ src/eval_kit/
   stats/         bootstrap.py
   experiments/   runner.py (run on the frozen dataset), results.py (read the scores)
   gate/          decision.py (safety, non-inferiority, report)
+  cli.py         the evalkit command (run, gate)
 tests/           one folder per subpackage, no network
 docs/DESIGN.md   principles, threat model, statistics and build plan
 ```
@@ -75,6 +76,25 @@ decision_correcte = 0
 outils_corrects   = 5
 ```
 
+## Command line
+
+```bash
+uv run evalkit run  --config eval.toml   # run an experiment (e.g. to create a first baseline)
+uv run evalkit gate --config eval.toml   # run the candidate, compare it to [baseline], decide
+```
+
+`evalkit gate` exits with **0** when the gate passes, **1** when it blocks (the agent
+regressed) and **2** when the evaluation could not be done (invalid config, missing
+baseline, empty dataset version). Both 1 and 2 fail a CI check; the code tells
+whether to fix the agent or the setup.
+
+The `[baseline]` section names the experiment of the version in production:
+
+```toml
+[baseline]
+experiment = "prompt-v6-7521d4ba"
+```
+
 ## Trajectory engine
 
 ```python
@@ -96,6 +116,6 @@ uv run pytest -q
 
 ## Status
 
-Steps 1 to 2.3 of the build plan (`docs/DESIGN.md`) are done: config, trajectory
-engine, statistics, experiment runner and score reader, gate decision. Next: the
-`evalkit` command line (2.4) and the migration of refund-agent (2.5).
+Steps 1 to 2.4 of the build plan (`docs/DESIGN.md`) are done: config, trajectory
+engine, statistics, experiment runner and score reader, gate decision, `evalkit`
+command line. Next: the migration of refund-agent (2.5).

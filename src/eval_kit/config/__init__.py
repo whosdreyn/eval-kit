@@ -2,6 +2,7 @@
 
 from eval_kit.config.loader import ConfigError, load_config
 from eval_kit.config.models import (
+    BaselineConfig,
     DatasetConfig,
     EvalConfig,
     JudgeConfig,
@@ -11,6 +12,7 @@ from eval_kit.config.models import (
 )
 
 __all__ = [
+    "BaselineConfig",
     "ConfigError",
     "DatasetConfig",
     "EvalConfig",
@@ -19,4 +21,5 @@ __all__ = [
     "RulesConfig",
     "RunConfig",
     "load_config",
+
 ]
