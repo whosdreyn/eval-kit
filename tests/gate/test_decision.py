@@ -159,3 +159,27 @@ def test_secondary_without_scores_never_blocks():
     result = decide(RULES, GOOD, candidate)
     assert result.passed
     assert any("message" in line and "no score" in line for line in result.report)
+
+
+
+# ── repetitions: a missing run must never hide a failure ───────────────────
+
+def test_missing_run_blocks_safety():
+    # ex2 has 2 scores out of 3: the third run could have been a failure.
+    candidate = {"no_ticket": {"ex1": [1, 1, 1], "ex2": [1, 1]}}
+    problems = check_safety(candidate, SAFETY, repetitions=3)
+    assert len(problems) == 1
+    assert "without exactly 3 scores" in problems[0]
+
+
+def test_missing_run_blocks_primary():
+    candidate = {"decision": {**BASE["decision"], "ex9": [1, 1]}}
+    problems, _ = check_primary(BASE, candidate, {"decision": 0}, repetitions=3)
+    assert len(problems) == 1
+    assert "partial data" in problems[0]
+
+
+def test_decide_checks_repetitions():
+    candidate = with_scores("no_ticket", {**GOOD["no_ticket"], "ex0": [1, 1]})
+    assert decide(RULES, GOOD, candidate).passed                    # count not checked
+    assert not decide(RULES, GOOD, candidate, repetitions=3).passed  # count checked

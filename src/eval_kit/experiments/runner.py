@@ -11,10 +11,8 @@ import subprocess
 from langsmith import Client
 
 from eval_kit.config import EvalConfig
-
-
-class RunError(Exception):
-    """Raised when the evaluation cannot start: nothing has been spent yet."""
+from eval_kit.experiments.errors import RunError
+from eval_kit.experiments.results import wait_for_complete_scores
 
 
 def resolve(spec: str):
@@ -70,6 +68,19 @@ def load_examples(config: EvalConfig, client: Client) -> list:
     return examples
 
 
+def rule_names(config: EvalConfig) -> set[str]:
+    """Every evaluator named in [rules]: safety, primary and secondary.
+
+    Args:
+        config: The validated eval.toml.
+
+    Returns:
+        The evaluator names the gate needs scores for.
+    """
+    rules = config.rules
+    return set(rules.safety) | set(rules.primary) | set(rules.secondary)
+
+
 def check_evaluators(config: EvalConfig, evaluators: list) -> None:
     """Fail before spending anything if a rule has no evaluator function.
 
@@ -81,9 +92,7 @@ def check_evaluators(config: EvalConfig, evaluators: list) -> None:
         RunError: listing every rule name that matches no evaluator function.
     """
     evaluator_names = {evaluator.__name__ for evaluator in evaluators}
-    rules = config.rules
-    rule_names = set(rules.safety) | set(rules.primary) | set(rules.secondary)
-    missing = rule_names - evaluator_names
+    missing = rule_names(config) - evaluator_names
     if missing:
         raise RunError(f"rules with no matching evaluator: {', '.join(sorted(missing))}")
 
@@ -105,8 +114,9 @@ def run_experiment(config: EvalConfig, client: Client) -> str:
     """Run the target on the frozen dataset and record the experiment in LangSmith.
 
     Sets EVAL_MODE=1 so the agent knows it must not act for real (design doc,
-    section 3.1), and stores what reproduces the run as experiment metadata
-    (principle P7).
+    section 3.1), stores what reproduces the run as experiment metadata
+    (principle P7), then waits until LangSmith has stored every score the
+    rules need, so the gate never decides on a partial read.
 
     Args:
         config: The validated eval.toml.
@@ -116,7 +126,8 @@ def run_experiment(config: EvalConfig, client: Client) -> str:
         The name of the new experiment.
 
     Raises:
-        RunError: if anything is wrong before the run starts.
+        RunError: if anything is wrong before the run starts, or if scores are
+            still missing after the run.
     """
     target = resolve(config.project.target)
     evaluators = resolve(config.project.evaluators)
@@ -140,5 +151,11 @@ def run_experiment(config: EvalConfig, client: Client) -> str:
             "judge_model": config.judge.model,
             "repetitions": config.run.repetitions,
         },
+    )
+    wait_for_complete_scores(
+        results.experiment_name,
+        evaluators=rule_names(config),
+        scenarios=[str(example.id) for example in examples],
+        repetitions=config.run.repetitions,
     )
     return results.experiment_name

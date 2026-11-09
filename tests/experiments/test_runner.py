@@ -98,6 +98,9 @@ def test_missing_evaluator_is_reported():
 def test_run_experiment_passes_the_config_to_langsmith(monkeypatch):
     fake = {"app:target": lambda inputs: {}, "app:EVALUATORS": [trajectoire_dag]}
     monkeypatch.setattr(runner, "resolve", lambda spec: fake[spec])
+    waited = {}
+    monkeypatch.setattr(runner, "wait_for_complete_scores",
+                        lambda experiment, **kwargs: waited.update(experiment=experiment, **kwargs))
     client = FakeEvaluateClient([NS(id="ex1")])
 
     name = runner.run_experiment(CONFIG, client)
@@ -108,3 +111,6 @@ def test_run_experiment_passes_the_config_to_langsmith(monkeypatch):
     assert call["max_concurrency"] == 4
     assert call["metadata"]["judge_model"] == "gpt-4.1-mini-2025-04-14"
     assert call["metadata"]["dataset_tag"] == "v3"
+    # The gate must never read a partial experiment: run_experiment waits first.
+    assert waited == {"experiment": "evalkit-123", "evaluators": {"trajectoire_dag"},
+                      "scenarios": ["ex1"], "repetitions": 3}

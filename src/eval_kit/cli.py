@@ -72,7 +72,8 @@ def cmd_gate(args: argparse.Namespace) -> int:
     candidate = run_experiment(config, Client())
     result = decide(config.rules,
                     experiment_scores(config.baseline.experiment),
-                    experiment_scores(candidate))
+                    experiment_scores(candidate),
+                    repetitions=config.run.repetitions)
 
     for line in result.report:
         print(line)
