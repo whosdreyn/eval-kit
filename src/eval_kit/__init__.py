@@ -1,22 +1,27 @@
-"""eval-kit: automated evaluation of LLM agents (trajectory engine, statistics, CI gate).
+"""eval-kit: automated evaluation of LLM agents, graphs, chatbots and RAG with LangSmith.
 
-Checks a trajectory against an agent configuration made of:
-  - a DAG of allowed transitions (order of tool calls);
-  - argument provenance rules (no invented API parameter);
-  - safety gates (no risky action without its prerequisite checks).
+Subpackages:
+    config        eval.toml schema and loader
+    trajectory    step-level checks of tool calls (DAG, argument provenance, safety gates)
+    stats         bootstrap confidence intervals
+    experiments   run an experiment on the frozen dataset and read its scores (LangSmith)
+    gate          the CI merge verdict (safety, non-inferiority, report)
 
-Typical use:
-    from eval_kit import from_langchain_messages, evaluate_trajectory
-    steps = from_langchain_messages(result["messages"])
-    report = evaluate_trajectory(steps, TRANSITIONS, ARGUMENTS, GATES)
+The trajectory engine is also exported at the top level, so existing code such as
+`from eval_kit import Step, evaluate_trajectory` keeps working.
 """
 
-from eval_kit.adapters import from_langchain_messages
-from eval_kit.arguments import check_arguments, field_values
-from eval_kit.engine import evaluate_trajectory
-from eval_kit.gates import check_gates
-from eval_kit.trajectory import Step
-from eval_kit.transitions import END, START, check_transitions
+from eval_kit.trajectory import (
+    END,
+    START,
+    Step,
+    check_arguments,
+    check_gates,
+    check_transitions,
+    evaluate_trajectory,
+    field_values,
+    from_langchain_messages,
+)
 
 __all__ = [
     "END",

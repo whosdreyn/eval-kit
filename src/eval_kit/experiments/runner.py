@@ -1,0 +1,144 @@
+"""Run the project's agent on its frozen dataset and record a LangSmith experiment.
+
+Everything that can fail for free (a wrong reference, a missing evaluator, an
+empty dataset version) is checked before the paid evaluate() call.
+"""
+
+import importlib
+import os
+import subprocess
+
+from langsmith import Client
+
+from eval_kit.config import EvalConfig
+
+
+class RunError(Exception):
+    """Raised when the evaluation cannot start: nothing has been spent yet."""
+
+
+def resolve(spec: str):
+    """Return the Python object named by "module.path:name".
+
+    Args:
+        spec: A reference such as "evaluation.ls_evals:target".
+
+    Returns:
+        The object: a function for target, a list for evaluators.
+
+    Raises:
+        RunError: if the reference is malformed, the module cannot be imported,
+            or the module has no such name.
+    """
+    try:
+        module_path, name = spec.split(":", 1)
+    except ValueError as e:
+        raise RunError(f"invalid reference {spec!r}: must be module.path:name") from e
+    try:
+        module = importlib.import_module(module_path)
+    except ModuleNotFoundError as e:
+        raise RunError(f"cannot import {module_path!r}: {e}") from e
+    try:
+        return getattr(module, name)
+    except AttributeError as e:
+        raise RunError(f"module {module_path!r} has no attribute {name!r}") from e
+
+
+def load_examples(config: EvalConfig, client: Client) -> list:
+    """Return the examples of the frozen dataset version and split.
+
+    Args:
+        config: The validated eval.toml.
+        client: LangSmith client (a fake one in tests).
+
+    Returns:
+        The examples of the dataset at its tag, in its split.
+
+    Raises:
+        RunError: if that version and split hold no example.
+    """
+    examples = list(client.list_examples(
+        dataset_name=config.dataset.name,
+        as_of=config.dataset.tag,
+        splits=[config.dataset.split],
+    ))
+    if not examples:
+        raise RunError(
+            f"no example in dataset {config.dataset.name!r} "
+            f"at tag {config.dataset.tag!r} in split {config.dataset.split!r}"
+        )
+    return examples
+
+
+def check_evaluators(config: EvalConfig, evaluators: list) -> None:
+    """Fail before spending anything if a rule has no evaluator function.
+
+    Args:
+        config: The validated eval.toml.
+        evaluators: The evaluator functions of the project.
+
+    Raises:
+        RunError: listing every rule name that matches no evaluator function.
+    """
+    evaluator_names = {evaluator.__name__ for evaluator in evaluators}
+    rules = config.rules
+    rule_names = set(rules.safety) | set(rules.primary) | set(rules.secondary)
+    missing = rule_names - evaluator_names
+    if missing:
+        raise RunError(f"rules with no matching evaluator: {', '.join(sorted(missing))}")
+
+
+def git_commit() -> str:
+    """Return the current git commit of the evaluated project.
+
+    Returns:
+        The commit hash, or "unknown" outside a git repository.
+    """
+    try:
+        return subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True,
+                              text=True, check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+
+
+def run_experiment(config: EvalConfig, client: Client) -> str:
+    """Run the target on the frozen dataset and record the experiment in LangSmith.
+
+    Sets EVAL_MODE=1 so the agent knows it must not act for real (design doc,
+    section 3.1), and stores what reproduces the run as experiment metadata
+    (principle P7).
+
+    Args:
+        config: The validated eval.toml.
+        client: LangSmith client.
+
+    Returns:
+        The name of the new experiment.
+
+    Raises:
+        RunError: if anything is wrong before the run starts.
+    """
+    target = resolve(config.project.target)
+    evaluators = resolve(config.project.evaluators)
+    check_evaluators(config, evaluators)
+    examples = load_examples(config, client)
+
+    os.environ["EVAL_MODE"] = "1"
+
+    results = client.evaluate(
+        target,
+        data=examples,
+        evaluators=evaluators,
+        num_repetitions=config.run.repetitions,
+        max_concurrency=config.run.max_concurrency,
+        experiment_prefix="evalkit",
+        metadata={
+            "git_commit": git_commit(),
+            "dataset": config.dataset.name,
+            "dataset_tag": config.dataset.tag,
+            "dataset_split": config.dataset.split,
+            "judge_model": config.judge.model,
+            "repetitions": config.run.repetitions,
+        },
+    )
+    return results.experiment_name

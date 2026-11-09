@@ -2,7 +2,7 @@
 
 import json
 
-from eval_kit.trajectory import Step
+from eval_kit.trajectory.step import Step
 
 
 def _parse_result(content):

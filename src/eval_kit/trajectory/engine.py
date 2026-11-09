@@ -1,9 +1,9 @@
 """Scoring: combine the three checks into a single score per trajectory."""
 
-from eval_kit.arguments import check_arguments
-from eval_kit.gates import check_gates
-from eval_kit.trajectory import Step
-from eval_kit.transitions import check_transitions
+from eval_kit.trajectory.arguments import check_arguments
+from eval_kit.trajectory.safety_gates import check_gates
+from eval_kit.trajectory.step import Step
+from eval_kit.trajectory.transitions import check_transitions
 
 
 def evaluate_trajectory(steps: list[Step], transitions: dict, arguments: dict, gates: dict) -> dict:

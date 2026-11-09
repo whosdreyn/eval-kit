@@ -1,6 +1,6 @@
 """Safety check: run the business gates that must pass before a risky tool call."""
 
-from eval_kit.trajectory import Step
+from eval_kit.trajectory.step import Step
 
 
 def check_gates(steps: list[Step], gates: dict) -> list[dict]:

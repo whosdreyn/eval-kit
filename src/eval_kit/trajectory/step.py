@@ -1,4 +1,4 @@
-"""Common trajectory format shared by every agent evaluated with the engine."""
+"""Common trajectory format: the list of tool calls an agent made, as Steps."""
 
 from dataclasses import dataclass
 from typing import Any

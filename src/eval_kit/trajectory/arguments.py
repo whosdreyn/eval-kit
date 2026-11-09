@@ -1,6 +1,6 @@
 """Hallucination check: does every controlled argument come from an earlier tool result?"""
 
-from eval_kit.trajectory import Step
+from eval_kit.trajectory.step import Step
 
 
 def field_values(obj, field: str) -> list:

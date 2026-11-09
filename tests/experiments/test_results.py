@@ -2,7 +2,7 @@
 
 from types import SimpleNamespace as NS
 
-from eval_kit.results import group_scores
+from eval_kit.experiments.results import group_scores
 
 
 def run(example, **scores):
