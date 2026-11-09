@@ -8,6 +8,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
 from langsmith import Client
 
 from eval_kit.config import ConfigError, EvalConfig, load_config
@@ -18,7 +19,11 @@ EXIT_PASSED, EXIT_BLOCKED, EXIT_ERROR = 0, 1, 2
 
 
 def _prepare(config_path: str) -> EvalConfig:
-    """Load eval.toml and make the evaluated project importable.
+    """Load eval.toml, the project's .env and make the evaluated project importable.
+
+    The .env next to eval.toml provides the API keys on a developer machine. It
+    never overrides a variable that is already set, so CI secrets always win.
+    Key values are never printed.
 
     Args:
         config_path: Path to eval.toml; its folder is the project root.
@@ -28,6 +33,7 @@ def _prepare(config_path: str) -> EvalConfig:
     """
     path = Path(config_path).resolve()
     config = load_config(path)
+    load_dotenv(path.parent / ".env", override=False)
     sys.path.insert(0, str(path.parent))
     return config
 

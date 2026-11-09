@@ -7,6 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "langsmith>=0.10.15",
     "pydantic>=2.14.3",
+    "python-dotenv>=1.0",
 ]
 
 [project.scripts]

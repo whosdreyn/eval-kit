@@ -93,3 +93,15 @@ def test_run_prints_the_experiment_name(project, capsys):
     config = project(EVAL_TOML, GOOD)
     assert cli.main(["run", "--config", config]) == cli.EXIT_PASSED
     assert "candidate-exp" in capsys.readouterr().out
+
+
+def test_project_env_file_is_loaded_without_overriding(project, monkeypatch, tmp_path):
+    config = project(EVAL_TOML + BASELINE, GOOD)
+    (tmp_path / ".env").write_text("EVALKIT_TEST_KEY=from-file\nEVALKIT_TEST_SET=from-file\n")
+    monkeypatch.delenv("EVALKIT_TEST_KEY", raising=False)
+    monkeypatch.setenv("EVALKIT_TEST_SET", "from-ci-secret")
+    cli.main(["gate", "--config", config])
+    import os
+    assert os.environ["EVALKIT_TEST_KEY"] == "from-file"        # missing: read from .env
+    assert os.environ["EVALKIT_TEST_SET"] == "from-ci-secret"   # already set: never overridden
+    monkeypatch.delenv("EVALKIT_TEST_KEY")
