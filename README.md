@@ -17,6 +17,7 @@ turns LangSmith experiments into a merge verdict that can block a pull request.
 | `eval_kit.trajectory` | step-level checks of tool calls, without any LLM: allowed transitions (DAG), argument provenance (no invented parameter), safety gates |
 | `eval_kit.stats` | paired bootstrap confidence intervals, resampling whole scenarios |
 | `eval_kit.experiments` | runs the agent on a frozen dataset version and reads the scores (LangSmith `runs.query`) |
+| `eval_kit.judges` | frozen LLM judges: dated model (alias refused), temperature 0, data kept apart from instructions in escaped `<data>` tags, strict JSON verdict (anything else is an error, never a pass), prompt fingerprint |
 | `eval_kit.gate` | the merge verdict: safety rules (zero tolerance), primary metrics (non-inferiority with a margin), secondary metrics (report only) |
 
 ## Layout
@@ -27,6 +28,7 @@ src/eval_kit/
   trajectory/    step.py, adapters.py, transitions.py, arguments.py, safety_gates.py, engine.py
   stats/         bootstrap.py
   experiments/   runner.py (run on the frozen dataset), results.py (read the scores)
+  judges/        prompt.py (protected prompt, fingerprint), judge.py (Judge, strict verdict)
   gate/          decision.py (safety, non-inferiority, report)
   cli.py         the evalkit command (run, gate)
 tests/           one folder per subpackage, no network
@@ -113,14 +115,32 @@ report = evaluate_trajectory(steps, TRANSITIONS, ARGUMENTS, GATES)
 An invented argument or a crossed safety gate gives a score of 0; an unexpected
 transition only lowers the score.
 
+## LLM judges
+
+```python
+from eval_kit.judges import Judge
+
+polite = Judge("gpt-4.1-mini-2025-04-14", "The message must be polite and clear, in French.")
+
+def message_conforme(outputs):
+    verdict = polite(message=outputs["message"])
+    return {"key": "message_conforme", "score": verdict.passed, "comment": verdict.reason}
+```
+
+The model must be dated, and must not be the agent's model when `[project] agent_model`
+is set. An answer that is not exactly `{"reason": str, "verdict": bool}` raises
+`JudgeError`: the score is then missing and the gate fails closed.
+
 ## Tests
 
 ```bash
-uv run pytest -q
+uv run pytest -q                                                   # offline, free
+OPENAI_API_KEY=... uv run pytest tests/judges/test_adversarial_live.py  # real judge vs injection traps
 ```
 
 ## Status
 
-Steps 1 to 2.4 of the build plan (`docs/DESIGN.md`) are done: config, trajectory
-engine, statistics, experiment runner and score reader, gate decision, `evalkit`
-command line. Next: the migration of refund-agent (2.5).
+Done: config, trajectory engine, statistics, experiment runner and score reader,
+gate decision, `evalkit` command line, refund-agent migration (step 2), frozen LLM
+judges (step 3, eval-kit side). Next: refund-agent judges on eval_kit.judges, then
+statistics (minimum detectable effect, pass^k consistency, judge/human kappa).

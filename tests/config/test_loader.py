@@ -113,3 +113,28 @@ def test_baseline_is_read(tmp_path):
     text = VALID + '\n[baseline]\nexperiment = "prompt-v6-7521d4ba"\n'
     config = load_config(write(tmp_path, text))
     assert config.baseline.experiment == "prompt-v6-7521d4ba"
+
+
+# ── the judge: dated (P5) and not the agent's model (P6) ───────────────────
+
+JUDGE = 'model = "gpt-4.1-mini-2025-04-14"'
+
+
+def test_undated_judge_is_refused(tmp_path):
+    message = error_message(write(tmp_path, VALID.replace(JUDGE, 'model = "gpt-4o-mini"')))
+    assert "judge.model" in message
+
+
+def test_dated_judge_without_dashes_is_accepted(tmp_path):
+    config = load_config(write(tmp_path, VALID.replace(JUDGE, 'model = "claude-haiku-4-5-20251001"')))
+    assert config.judge.model == "claude-haiku-4-5-20251001"
+
+
+def test_judge_same_as_agent_is_refused(tmp_path):
+    text = VALID.replace('profile = "agent"', 'profile = "agent"\nagent_model = "gpt-4.1-mini"')
+    assert "must not judge itself" in error_message(write(tmp_path, text))
+
+
+def test_judge_different_from_agent_is_accepted(tmp_path):
+    text = VALID.replace('profile = "agent"', 'profile = "agent"\nagent_model = "gpt-4o-mini"')
+    assert load_config(write(tmp_path, text)).project.agent_model == "gpt-4o-mini"

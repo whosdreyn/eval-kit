@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "langsmith>=0.10.15",
+    "openai>=1.40",
     "pydantic>=2.14.3",
     "python-dotenv>=1.0",
 ]

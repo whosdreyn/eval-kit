@@ -4,6 +4,7 @@ Every model forbids unknown keys and is read-only, so a typo in eval.toml is an
 error and nothing can change the configuration once it has been loaded.
 """
 
+import re
 from itertools import combinations
 from typing import Annotated, Literal
 
@@ -17,6 +18,27 @@ Margin = Annotated[float, Field(ge=0, le=100)]
 
 # What an evaluation run may do with a tool (design doc, section 3.1).
 ToolAccess = Literal["read", "simulated", "forbidden"]
+
+# A dated model name ends with its release date, with or without dashes:
+# gpt-4o-mini-2024-07-18, claude-haiku-4-5-20251001 (principle P5).
+DATED_MODEL_PATTERN = r".*\d{4}-?\d{2}-?\d{2}$"
+_RELEASE_DATE = re.compile(r"-\d{4}-?\d{2}-?\d{2}$")
+
+
+def model_family(name: str) -> str:
+    """Strip the release date from a model name, so both names of one model compare equal.
+
+    Example:
+        >>> model_family("gpt-4o-mini-2024-07-18")
+        'gpt-4o-mini'
+
+    Args:
+        name: A model name, dated or not.
+
+    Returns:
+        The name without its trailing release date.
+    """
+    return _RELEASE_DATE.sub("", name)
 
 
 class Strict(BaseModel):
@@ -32,11 +54,14 @@ class ProjectConfig(Strict):
         profile: Kind of application, which decides the default checks.
         target: "module:function" run on each dataset example.
         evaluators: "module:LIST" holding every evaluator function of the project.
+        agent_model: Model of the evaluated agent, if any. When given, the judge
+            must be another model (principle P6).
     """
 
     profile: Literal["agent", "graph", "rag", "chat"]
     target: str = Field(pattern=REFERENCE_PATTERN)
     evaluators: str = Field(pattern=REFERENCE_PATTERN)
+    agent_model: str | None = None
 
 
 class DatasetConfig(Strict):
@@ -59,11 +84,12 @@ class JudgeConfig(Strict):
     """[judge]: the frozen LLM judge (principle P5).
 
     Attributes:
-        model: Dated model name, never a moving alias.
+        model: Dated model name, never a moving alias: an alias silently changes
+            the judge, and the baseline is no longer comparable.
         temperature: Must be 0, so the same output always gets the same verdict.
     """
 
-    model: str = Field(min_length=1)
+    model: str = Field(min_length=1, pattern=DATED_MODEL_PATTERN)
     temperature: float = Field(default=0.0, ge=0.0, le=0.0)
 
 
@@ -156,5 +182,27 @@ class EvalConfig(Strict):
             raise ValueError(
                 f"profile '{self.project.profile}' requires a [tools] whitelist: "
                 "every tool must be declared read, simulated or forbidden"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def judge_differs_from_agent(self) -> "EvalConfig":
+        """Refuse a judge that is the agent's own model (principle P6).
+
+        A model judging its own outputs shares its blind spots and tends to
+        prefer them. Names are compared without their release date, since
+        "gpt-4o-mini" and "gpt-4o-mini-2024-07-18" are the same model.
+
+        Returns:
+            The validated configuration.
+
+        Raises:
+            ValueError: if [project] agent_model and [judge] model are one model.
+        """
+        agent = self.project.agent_model
+        if agent and model_family(agent) == model_family(self.judge.model):
+            raise ValueError(
+                f"judge model {self.judge.model!r} is the agent's model {agent!r}: "
+                "a model must not judge itself (P6)"
             )
         return self
