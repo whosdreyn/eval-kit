@@ -20,6 +20,7 @@ class ProjectConfig(Strict):
 
     profile: Literal["agent", "graph", "rag", "chat"]
     target: str = Field(pattern=r"^[\w.]+:\w+$")  # "module.path:function"
+    evaluators: str = Field(pattern=r"^[\w.]+:\w+$")   
 
 
 class DatasetConfig(Strict):

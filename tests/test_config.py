@@ -10,6 +10,7 @@ VALID = """
 [project]
 profile = "agent"
 target  = "refund_agent.eval:target"
+evaluators = "refund_agent.eval:EVALUATORS"
 
 [dataset]
 name = "refund-scenarios"
