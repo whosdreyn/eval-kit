@@ -127,8 +127,10 @@ def message_conforme(outputs):
     return {"key": "message_conforme", "score": verdict.passed, "comment": verdict.reason}
 ```
 
-The model must be dated, and must not be the agent's model when `[project] agent_model`
-is set. An answer that is not exactly `{"reason": str, "verdict": bool}` raises
+Expose the judge on the evaluator (`message_conforme.judge = polite`): `evalkit` then
+refuses a judge whose model is not `[judge] model`, and records each judge's fingerprint
+(`judge_hashes`) in the experiment metadata. The model must be dated, and must not be
+the agent's model when `[project] agent_model` is set. An answer that is not exactly `{"reason": str, "verdict": bool}` raises
 `JudgeError`: the score is then missing and the gate fails closed.
 
 ## Tests

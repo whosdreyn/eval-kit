@@ -6,7 +6,8 @@ import pytest
 
 from eval_kit.config import EvalConfig, load_config
 from eval_kit.experiments import runner
-from eval_kit.experiments.runner import RunError, check_evaluators, load_examples, resolve
+from eval_kit.experiments.runner import RunError, check_evaluators, check_judges, load_examples, resolve
+from eval_kit.judges import Judge
 
 CONFIG = EvalConfig(
     project={"profile": "rag", "target": "app:target", "evaluators": "app:EVALUATORS"},
@@ -116,3 +117,34 @@ def test_run_experiment_passes_the_config_to_langsmith(monkeypatch):
     # The gate must never read a partial experiment: run_experiment waits first.
     assert waited == {"experiment": "evalkit-123", "evaluators": {"trajectoire_dag"},
                       "scenarios": ["ex1"], "repetitions": 3}
+
+
+
+# ── judges: the model of eval.toml, fingerprints recorded ──────────────────
+
+def judged(name: str, model: str):
+    """A fake evaluator that carries a Judge, like the projects' LLM evaluators."""
+    def evaluator(outputs):
+        return True
+    evaluator.__name__ = name
+    evaluator.judge = Judge(model, "The message must be polite.")
+    return evaluator
+
+
+def test_judge_with_the_declared_model_is_accepted():
+    check_judges(CONFIG, [judged("polite", "gpt-4.1-mini-2025-04-14"), trajectoire_dag])
+
+
+def test_judge_with_another_model_is_refused():
+    with pytest.raises(RunError, match="polite uses 'gpt-4o-mini-2024-07-18'"):
+        check_judges(CONFIG, [judged("polite", "gpt-4o-mini-2024-07-18")])
+
+
+def test_judge_hashes_are_recorded(monkeypatch):
+    polite = judged("polite", "gpt-4.1-mini-2025-04-14")
+    fake = {"app:target": lambda inputs: {}, "app:EVALUATORS": [trajectoire_dag, polite]}
+    monkeypatch.setattr(runner, "resolve", lambda spec: fake[spec])
+    monkeypatch.setattr(runner, "wait_for_complete_scores", lambda experiment, **kwargs: None)
+    client = FakeEvaluateClient([NS(id="ex1")])
+    runner.run_experiment(CONFIG, client)
+    assert client.evaluate_call["metadata"]["judge_hashes"] == {"polite": polite.judge.hash}
