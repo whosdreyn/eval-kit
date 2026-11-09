@@ -5,6 +5,7 @@ description = "Automated evaluation of LLM agents, graphs, chatbots and RAG with
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "langsmith>=0.10.15",
     "pydantic>=2.14.3",
 ]
 
