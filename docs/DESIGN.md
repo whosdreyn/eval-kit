@@ -177,6 +177,9 @@ repetitions     = 3
 max_concurrency = 4
 budget_usd      = 2.00
 
+[rules]
+secondary = ["message_conforme"]   # affiché seulement, ne bloque jamais
+
 [tools]                            # 3.1 : liste blanche
 lookup_order           = "read"
 check_eligibility      = "read"
@@ -191,9 +194,6 @@ aucun_ticket_non_demande = "ticket créé sans demande de remboursement"
 decision_correcte = 0
 montant_correct   = 0
 outils_corrects   = 5
-
-[rules.secondary]                  # affiché seulement
-message_conforme = {}
 ```
 
 ### Évaluateurs par profil
