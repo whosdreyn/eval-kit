@@ -111,6 +111,8 @@ def test_run_experiment_passes_the_config_to_langsmith(monkeypatch):
     assert call["max_concurrency"] == 4
     assert call["metadata"]["judge_model"] == "gpt-4.1-mini-2025-04-14"
     assert call["metadata"]["dataset_tag"] == "v3"
+    # Only agent runs are traced: evaluator traces would exhaust the monthly quota.
+    assert call["disable_evaluator_tracing"] is True
     # The gate must never read a partial experiment: run_experiment waits first.
     assert waited == {"experiment": "evalkit-123", "evaluators": {"trajectoire_dag"},
                       "scenarios": ["ex1"], "repetitions": 3}

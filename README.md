@@ -83,6 +83,11 @@ uv run evalkit run  --config eval.toml   # run an experiment (e.g. to create a f
 uv run evalkit gate --config eval.toml   # run the candidate, compare it to [baseline], decide
 ```
 
+Each run traces the agent only (one trace per example and repetition): evaluators
+record their scores without a trace of their own, to stay within LangSmith's monthly
+trace quota. If the quota is exceeded anyway, LangSmith drops runs, the scores stay
+incomplete and the gate stops with code 2 instead of deciding on partial data.
+
 `evalkit gate` exits with **0** when the gate passes, **1** when it blocks (the agent
 regressed) and **2** when the evaluation could not be done (invalid config, missing
 baseline, empty dataset version). Both 1 and 2 fail a CI check; the code tells

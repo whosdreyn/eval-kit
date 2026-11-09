@@ -116,7 +116,8 @@ def run_experiment(config: EvalConfig, client: Client) -> str:
     Sets EVAL_MODE=1 so the agent knows it must not act for real (design doc,
     section 3.1), stores what reproduces the run as experiment metadata
     (principle P7), then waits until LangSmith has stored every score the
-    rules need, so the gate never decides on a partial read.
+    rules need, so the gate never decides on a partial read. Evaluators are not
+    traced, only the agent runs are: their scores are recorded all the same.
 
     Args:
         config: The validated eval.toml.
@@ -143,6 +144,10 @@ def run_experiment(config: EvalConfig, client: Client) -> str:
         num_repetitions=config.run.repetitions,
         max_concurrency=config.run.max_concurrency,
         experiment_prefix="evalkit",
+        # Scores are still recorded, but evaluators (and their LLM judge calls)
+        # create no trace of their own: about 30 traces per run instead of ~240,
+        # which keeps the gate within LangSmith's monthly trace quota.
+        disable_evaluator_tracing=True,
         metadata={
             "git_commit": git_commit(),
             "dataset": config.dataset.name,
