@@ -5,13 +5,14 @@ The three categories of [rules] get three different treatments (principle P2):
   - primary:   blocks when the candidate is proven worse than the baseline
                beyond the margin of eval.toml (paired bootstrap, 95% CI);
   - secondary: compared like primary metrics, but reported only, never blocking.
+Every rule also gets a pass^k line (consistency across repetitions), report only.
 """
 
 from dataclasses import dataclass
 
 from eval_kit.config import RulesConfig
 from eval_kit.experiments.results import Scores
-from eval_kit.stats import bootstrap_diff_ci
+from eval_kit.stats import bootstrap_diff_ci, consistency
 
 # A margin no difference of scores can exceed: such a metric is never "worse".
 REPORT_ONLY_MARGIN = 100
@@ -121,6 +122,35 @@ def check_primary(baseline: Scores, candidate: Scores, primary: dict[str, float]
                             f"({diff * 100:+.1f} points, beyond the {margin:g}-point margin)")
     return problems, report
 
+def consistency_report(candidate: Scores, evaluators: list[str],
+                       repetitions: int | None = None) -> list[str]:
+    """One report line per evaluator: pass^k, then the flaky and never-passing scenarios.
+
+    Report only, never blocking: a mean can hide an unstable agent, and this line
+    shows it to whoever reviews the change.
+
+    Args:
+        candidate: Scores of the experiment under review.
+        evaluators: Evaluators to report on (every rule of eval.toml).
+        repetitions: k, the repetitions per scenario; None writes "k".
+
+    Returns:
+        Lines such as "no_ticket: pass^3 9/10 (flaky: d2c300e5)".
+    """
+    k = repetitions if repetitions is not None else "k"
+    lines = []
+    for evaluator in evaluators:
+        result = consistency(candidate.get(evaluator, {}))
+        if result["pass_hat_k"] is None:
+            lines.append(f"{evaluator}: pass^{k} no score")
+            continue
+        line = f"{evaluator}: pass^{k} {len(result['always'])}/{len(candidate[evaluator])}"
+        details = [f"{group}: {', '.join(name[:8] for name in result[group])}"
+                   for group in ("flaky", "never") if result[group]]
+        if details:
+            line += f" ({'; '.join(details)})"
+        lines.append(line)
+    return lines
 
 @dataclass(frozen=True)
 class GateResult:
@@ -139,7 +169,7 @@ class GateResult:
 
 def decide(rules: RulesConfig, baseline: Scores, candidate: Scores,
            repetitions: int | None = None) -> GateResult:
-    """Apply every rule of eval.toml: safety, then primary, then secondary (report only).
+    """Apply every rule of eval.toml: safety, then primary, then secondary and pass^k (report only).
 
     Args:
         rules: The [rules] section of eval.toml.
@@ -161,5 +191,7 @@ def decide(rules: RulesConfig, baseline: Scores, candidate: Scores,
         baseline, candidate, dict.fromkeys(rules.secondary, REPORT_ONLY_MARGIN), repetitions)
     report += info_report
     report += [f"{p} (info, not blocking)" for p in info_problems]
+    every_rule = sorted(set(rules.safety) | set(rules.primary) | set(rules.secondary))
+    report += consistency_report(candidate, every_rule, repetitions)
 
     return GateResult(passed=not problems, problems=problems, report=report)

@@ -1,7 +1,7 @@
 """Tests of the gate decisions: fake scores, no network."""
 
 from eval_kit.config import RulesConfig
-from eval_kit.gate import check_primary, check_safety, decide
+from eval_kit.gate import check_primary, check_safety, consistency_report, decide
 
 SAFETY = {"no_ticket": "ticket without request"}
 
@@ -183,3 +183,42 @@ def test_decide_checks_repetitions():
     candidate = with_scores("no_ticket", {**GOOD["no_ticket"], "ex0": [1, 1]})
     assert decide(RULES, GOOD, candidate).passed                    # count not checked
     assert not decide(RULES, GOOD, candidate, repetitions=3).passed  # count checked
+
+
+
+# ── consistency in the report (pass^k), never blocking ─────────────────────
+
+LONG_ID = "d2c300e5-c2ed-4b63-be75-a9fd12af1f7b"   # real LangSmith example ids are long
+
+
+def test_stable_evaluator_reports_full_pass_hat_k():
+    candidate = {"decision": {f"ex{i}": [1, 1, 1] for i in range(10)}}
+    lines = consistency_report(candidate, ["decision"], repetitions=3)
+    assert lines == ["decision: pass^3 10/10"]
+
+
+def test_flaky_and_never_scenarios_are_named_with_short_ids():
+    candidate = {"no_ticket": {LONG_ID: [1, 0, 1], "ex2": [0, 0, 0], "ex3": [1, 1, 1]}}
+    [line] = consistency_report(candidate, ["no_ticket"], repetitions=3)
+    assert line.startswith("no_ticket: pass^3 1/3")
+    assert "flaky: d2c300e5" in line and LONG_ID not in line
+    assert "never: ex2" in line
+
+
+def test_evaluator_without_scores_is_reported():
+    assert consistency_report({}, ["decision"], repetitions=3) == ["decision: pass^3 no score"]
+
+
+def test_unknown_repetitions_reads_pass_hat_k():
+    candidate = {"decision": {"ex1": [1, 1]}}
+    assert consistency_report(candidate, ["decision"]) == ["decision: pass^k 1/1"]
+
+
+def test_decide_reports_consistency_without_blocking():
+    # A flaky primary scenario: not a proven regression, so the gate passes,
+    # but the instability must be visible in the report.
+    candidate = with_scores("decision", {**GOOD["decision"], "ex3": [1, 0, 1]})
+    result = decide(RULES, GOOD, candidate, repetitions=3)
+    assert result.passed
+    assert any(line.startswith("decision: pass^3 9/10") and "flaky: ex3" in line
+               for line in result.report)
