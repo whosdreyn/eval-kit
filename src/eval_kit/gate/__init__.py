@@ -6,6 +6,8 @@ from eval_kit.gate.decision import (
     check_safety,
     consistency_report,
     decide,
+    power_report,
 )
 
-__all__ = ["GateResult", "check_primary", "check_safety", "consistency_report", "decide"]
+__all__ = ["GateResult", "check_primary", "check_safety", "consistency_report", "decide",
+           "power_report"]

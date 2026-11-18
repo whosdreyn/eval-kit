@@ -5,14 +5,20 @@ The three categories of [rules] get three different treatments (principle P2):
   - primary:   blocks when the candidate is proven worse than the baseline
                beyond the margin of eval.toml (paired bootstrap, 95% CI);
   - secondary: compared like primary metrics, but reported only, never blocking.
-Every rule also gets a pass^k line (consistency across repetitions), report only.
+Every rule also gets a pass^k line (consistency across repetitions), and the
+report ends with the gate's power for this dataset size; both are report only.
 """
 
 from dataclasses import dataclass
 
 from eval_kit.config import RulesConfig
 from eval_kit.experiments.results import Scores
-from eval_kit.stats import bootstrap_diff_ci, consistency
+from eval_kit.stats import (
+    bootstrap_diff_ci,
+    consistency,
+    detectable_drop,
+    scenarios_needed,
+)
 
 # A margin no difference of scores can exceed: such a metric is never "worse".
 REPORT_ONLY_MARGIN = 100
@@ -152,6 +158,32 @@ def consistency_report(candidate: Scores, evaluators: list[str],
         lines.append(line)
     return lines
 
+
+TARGET_DROP = 0.10   # a gate that cannot see a 10-point drop is flagged in the report
+
+
+def power_report(n_scenarios: int) -> str:
+    """One report line: the smallest drop this dataset size lets the gate prove.
+
+    A passing gate only means "no proven regression": with few scenarios, real
+    regressions stay invisible. This line says how blind the gate is.
+
+    Args:
+        n_scenarios: Scenarios the candidate ran on.
+
+    Returns:
+        A line such as "power: 10 scenarios, a drop is proven only from 4 broken
+        scenarios (40 points); 36 scenarios would prove a 10-point drop".
+    """
+    m = detectable_drop(n_scenarios)
+    if m is None:
+        return "power: no scenario"
+    points = m / n_scenarios * 100  # e.g. 4 out of 10 -> 40 points
+    if m / n_scenarios <= TARGET_DROP:
+        return f"power: {n_scenarios} scenarios, a drop is proven from {m} broken scenarios ({points:.0f} points)"
+    return (f"power: {n_scenarios} scenarios, a drop is proven only from {m} broken "
+            f"scenarios ({points:.0f} points); {scenarios_needed(TARGET_DROP)} scenarios would prove a 10-point drop")
+
 @dataclass(frozen=True)
 class GateResult:
     """The verdict of the gate.
@@ -193,5 +225,8 @@ def decide(rules: RulesConfig, baseline: Scores, candidate: Scores,
     report += [f"{p} (info, not blocking)" for p in info_problems]
     every_rule = sorted(set(rules.safety) | set(rules.primary) | set(rules.secondary))
     report += consistency_report(candidate, every_rule, repetitions)
-
+    scenarios = set()
+    for by_scenario in candidate.values():
+        scenarios |= set(by_scenario)
+    report.append(power_report(len(scenarios)))
     return GateResult(passed=not problems, problems=problems, report=report)

@@ -1,7 +1,7 @@
 """Tests of the gate decisions: fake scores, no network."""
 
 from eval_kit.config import RulesConfig
-from eval_kit.gate import check_primary, check_safety, consistency_report, decide
+from eval_kit.gate import check_primary, check_safety, consistency_report, decide, power_report
 
 SAFETY = {"no_ticket": "ticket without request"}
 
@@ -222,3 +222,24 @@ def test_decide_reports_consistency_without_blocking():
     assert result.passed
     assert any(line.startswith("decision: pass^3 9/10") and "flaky: ex3" in line
                for line in result.report)
+
+
+
+# ── power in the report: what this dataset size can and cannot prove ───────
+
+def test_small_dataset_warns_and_says_how_many_scenarios_are_needed():
+    assert power_report(10) == ("power: 10 scenarios, a drop is proven only from 4 broken "
+                                "scenarios (40 points); 36 scenarios would prove a 10-point drop")
+
+
+def test_large_enough_dataset_just_states_its_power():
+    assert power_report(40) == "power: 40 scenarios, a drop is proven from 4 broken scenarios (10 points)"
+
+
+def test_no_scenario_has_no_power():
+    assert power_report(0) == "power: no scenario"
+
+
+def test_decide_reports_the_power_of_the_run():
+    result = decide(RULES, GOOD, GOOD, repetitions=3)
+    assert any(line.startswith("power: 10 scenarios") for line in result.report)
