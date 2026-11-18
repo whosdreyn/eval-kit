@@ -2,5 +2,7 @@
 
 from eval_kit.stats.bootstrap import bootstrap_diff_ci, bootstrap_mean_ci
 from eval_kit.stats.consistency import consistency
+from eval_kit.stats.power import detectable_drop, scenarios_needed
 
-__all__ = ["bootstrap_diff_ci", "bootstrap_mean_ci", "consistency"]
+__all__ = ["bootstrap_diff_ci", "bootstrap_mean_ci", "consistency",
+           "detectable_drop", "scenarios_needed"]
